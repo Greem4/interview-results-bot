@@ -1,0 +1,4 @@
+app:
+  bot:
+    token: ${TOKEN_BOT}
+    username: ${BOT_USERNAME}
