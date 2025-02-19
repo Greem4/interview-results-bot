@@ -1,5 +1,7 @@
 package ru.greemlab.interviewresultsbot.service;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -17,13 +19,33 @@ public class UserStateService {
         FINISHED
     }
 
-    private final Map<Long, UserState> userStates = new HashMap<>();
+    @Getter
+    @Setter
+    public static class UserSession {
+        private UserState state = UserState.START;
+        private String candidateKey; // "victoria" / "alexander" / "svetlana" / null
 
-    public UserState getState(Long userId) {
-        return userStates.getOrDefault(userId, UserState.START);
     }
 
-    public void setState(Long userId, UserState state) {
-        userStates.put(userId, state);
+    private final Map<Long, UserSession> userSessions = new HashMap<>();
+
+    private UserSession getUserSession(Long chatId) {
+        return userSessions.computeIfAbsent(chatId, c -> new UserSession());
+    }
+
+    public UserState getState(Long chatId) {
+        return getUserSession(chatId).getState();
+    }
+
+    public void setState(Long chatId, UserState state) {
+        getUserSession(chatId).setState(state);
+    }
+
+    public String getCandidate(Long chatId) {
+        return getUserSession(chatId).getCandidateKey();
+    }
+
+    public void setCandidate(Long chatId, String candidateKey) {
+        getUserSession(chatId).setCandidateKey(candidateKey);
     }
 }
