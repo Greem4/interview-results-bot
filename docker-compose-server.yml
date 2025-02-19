@@ -1,0 +1,16 @@
+services:
+  candidate-evaluation-bot:
+    image: interview-results-bot-candidate-evaluation-bot:latest
+    container_name: candidate-evaluation-bot
+    restart: always
+    ports:
+      - "8084:8084"
+    environment:
+      BOT_USERNAME: ${BOT_USERNAME}
+      TOKEN_BOT: ${TOKEN_BOT}
+    networks:
+      - bot_network
+
+networks:
+  bot_network:
+    driver: bridge

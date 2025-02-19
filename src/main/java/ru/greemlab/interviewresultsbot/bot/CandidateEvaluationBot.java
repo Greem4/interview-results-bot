@@ -143,7 +143,7 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
 
                     userStateService.setState(chatId, UserState.WAITING_INVITE);
                     editMessageText(chatId, messageId,
-                            "Пригласили ли вы данного кандидата на работу?",
+                            "Пригласили ли Вы данного кандидата на работу?",
                             makeInviteButtons());
                 }
                 break;
