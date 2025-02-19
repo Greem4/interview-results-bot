@@ -1,7 +1,9 @@
 services:
-  candidate-evaluation-bot:
-    build: .
-    container_name: candidate-evaluation-bot
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: interview
     ports:
       - "8084:8084"
     environment:

@@ -1,7 +1,7 @@
 services:
-  candidate-evaluation-bot:
-    image: interview-results-bot-candidate-evaluation-bot:latest
-    container_name: candidate-evaluation-bot
+  app:
+    image: interview-results-bot-app:latest
+    container_name: interview-bot
     restart: always
     ports:
       - "8084:8084"
