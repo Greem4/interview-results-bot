@@ -48,7 +48,6 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
         var chatId = message.getChatId();
 
         if (text.equals("/start")) {
-            // Начало: предложим кнопку "Иванов И.И."
             userStateService.setState(chatId, UserState.START);
             sendMessage(chatId, "Привет! Нажмите, чтобы оценить кандидата:", makeCandidateButton());
         } else {
@@ -87,7 +86,7 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
             case WAITING_INTEREST -> {
                 if (data.startsWith("INTR_")) {
                     var score = Integer.parseInt(data.substring("INTR_".length()));
-                    voteStatisticsService.addResponsibility(score);
+                    voteStatisticsService.addInterest(score);
 
                     userStateService.setState(chatId, UserState.WAITING_RESULT_FOCUS);
                     editMessageText(chatId,
@@ -98,13 +97,13 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
             case WAITING_RESULT_FOCUS -> {
                 if (data.startsWith("RESF_")) {
                     var score = Integer.parseInt(data.substring("RESF_".length()));
-                    voteStatisticsService.addResponsibility(score);
+                    voteStatisticsService.addResultFocus(score);
                 }
 
                 userStateService.setState(chatId, UserState.WAITING_INVITE);
                 editMessageText(chatId,
                         messageId,
-                        "ригласили ли вы данного кандидата на работу?",
+                        "Пригласите данного кандидата на работу?",
                         makeInviteButtons());
             }
             case WAITING_INVITE -> {
@@ -167,6 +166,7 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
     private InlineKeyboardMarkup makeInviteButtons() {
         var yesBtn = new InlineKeyboardButton();
         yesBtn.setText("Да");
+        yesBtn.setCallbackData("INVITE_YES");
 
         var noBtn = new InlineKeyboardButton();
         noBtn.setText("Нет");
@@ -183,7 +183,6 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
         markup.setKeyboard(keyboard);
         return markup;
     }
-
 
     private void sendMessage(Long chatId, String text, InlineKeyboardMarkup replyMarkup) {
         var msg = new SendMessage();
