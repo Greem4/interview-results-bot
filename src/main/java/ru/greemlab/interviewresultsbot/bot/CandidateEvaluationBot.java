@@ -187,19 +187,19 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
         InlineKeyboardButton btnVictoria = new InlineKeyboardButton("Виктория");
         btnVictoria.setCallbackData(CANDIDATE_VICTORIA);
 
-        InlineKeyboardButton btnAlexander = new InlineKeyboardButton("Александр");
-        btnAlexander.setCallbackData(CANDIDATE_ALEXANDER);
-
         InlineKeyboardButton btnSvetlana = new InlineKeyboardButton("Светлана");
         btnSvetlana.setCallbackData(CANDIDATE_SVETLANA);
+
+        InlineKeyboardButton btnAlexander = new InlineKeyboardButton("Александр");
+        btnAlexander.setCallbackData(CANDIDATE_ALEXANDER);
 
         InlineKeyboardButton btnArchive = new InlineKeyboardButton("Архив соискателей");
         btnArchive.setCallbackData(ARCHIVE_CALLBACK);
 
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
         keyboard.add(List.of(btnVictoria));
-        keyboard.add(List.of(btnAlexander));
         keyboard.add(List.of(btnSvetlana));
+        keyboard.add(List.of(btnAlexander));
         keyboard.add(List.of(btnArchive));
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -239,10 +239,10 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
         switch (key) {
             case CANDIDATE_VICTORIA:
                 return "Виктория";
-            case CANDIDATE_ALEXANDER:
-                return "Александр";
             case CANDIDATE_SVETLANA:
                 return "Светлана";
+            case CANDIDATE_ALEXANDER:
+                return "Александр";
             default:
                 return "Неизвестно";
         }
