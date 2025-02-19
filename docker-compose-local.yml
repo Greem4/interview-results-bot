@@ -1,0 +1,10 @@
+services:
+  candidate-evaluation-bot:
+    build: .
+    container_name: candidate-evaluation-bot
+    ports:
+      - "8084:8084"
+    environment:
+      BOT_USERNAME: ${BOT_USERNAME}
+      TOKEN_BOT: ${TOKEN_BOT}
+    restart: always
