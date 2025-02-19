@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -12,7 +13,7 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import ru.greemlab.interviewresultsbot.service.ArchiveCandidatesService; // <-- наш новый сервис
+import ru.greemlab.interviewresultsbot.service.ArchiveCandidatesService;
 import ru.greemlab.interviewresultsbot.service.UserStateService;
 import ru.greemlab.interviewresultsbot.service.VoteStatisticsService;
 
@@ -39,7 +40,7 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
 
     private final UserStateService userStateService;
     private final VoteStatisticsService voteStatisticsService;
-    private final ArchiveCandidatesService archiveCandidatesService; // <-- добавили
+    private final ArchiveCandidatesService archiveCandidatesService;
 
     @Override
     public void onUpdateReceived(Update update) {
@@ -68,6 +69,13 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
     }
 
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
+        // Отвечаем на callback, чтобы убрать "часики"
+        try {
+            execute(new AnswerCallbackQuery(callbackQuery.getId()));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         String data = callbackQuery.getData();
         Long chatId = callbackQuery.getMessage().getChatId();
         Integer messageId = callbackQuery.getMessage().getMessageId();
@@ -94,8 +102,8 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
                     editMessageText(
                             chatId,
                             messageId,
-                            "Вы выбрали кандидата: " + candidateName
-                            + "\n\nОцените ответственность (1..5):",
+                            "Вы выбрали кандидата: " + candidateName +
+                            "\n\nОцените ответственность (1..5):",
                             makeScoreButtons("RESP_")
                     );
                 }
@@ -149,13 +157,21 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
                         voteStatisticsService.addInviteNo(cKey);
                     }
 
-                    userStateService.setState(chatId, UserState.FINISHED);
-
+                    // Получаем статистику и формируем итоговое сообщение
                     String stats = voteStatisticsService.getCandidateStatistics(cKey);
                     String finalText = "Спасибо за вашу оценку!\n\nСтатистика по кандидату:\n"
                                        + convertKeyToName(cKey) + "\n\n"
                                        + stats;
+                    // Отредактируем сообщение с результатами
                     editMessageText(chatId, messageId, finalText, null);
+
+                    // Сбрасываем состояние в старт, чтобы новые нажатия обрабатывались
+                    userStateService.setState(chatId, UserState.START);
+                    userStateService.setCandidate(chatId, null);
+
+                    // Отправляем новое сообщение со стартовыми кнопками
+                    sendMessage(chatId, "Для нового голосования введите /start или нажмите кнопку ниже:",
+                            makeStartButtons());
                 }
                 break;
 
@@ -221,14 +237,18 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
     // Преобразуем ключ в отображаемое имя
     private String convertKeyToName(String key) {
         switch (key) {
-            case CANDIDATE_VICTORIA:   return "Виктория";
-            case CANDIDATE_ALEXANDER:  return "Александр";
-            case CANDIDATE_SVETLANA:   return "Светлана";
-            default:                   return "Неизвестно";
+            case CANDIDATE_VICTORIA:
+                return "Виктория";
+            case CANDIDATE_ALEXANDER:
+                return "Александр";
+            case CANDIDATE_SVETLANA:
+                return "Светлана";
+            default:
+                return "Неизвестно";
         }
     }
 
-    // Отправить новое сообщение
+    // Отправка нового сообщения
     private void sendMessage(Long chatId, String text, InlineKeyboardMarkup replyMarkup) {
         SendMessage msg = new SendMessage();
         msg.setChatId(chatId.toString());
@@ -236,7 +256,6 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
         if (replyMarkup != null) {
             msg.setReplyMarkup(replyMarkup);
         }
-
         try {
             execute(msg);
         } catch (Exception e) {
@@ -244,7 +263,7 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
         }
     }
 
-    // Отредактировать существующее сообщение (заменить текст/клавиатуру)
+    // Редактирование существующего сообщения
     private void editMessageText(Long chatId, Integer messageId, String newText, InlineKeyboardMarkup markup) {
         EditMessageText edit = new EditMessageText();
         edit.setChatId(chatId.toString());
@@ -253,11 +272,12 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
         if (markup != null) {
             edit.setReplyMarkup(markup);
         }
-
         try {
             execute(edit);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
 }
+
