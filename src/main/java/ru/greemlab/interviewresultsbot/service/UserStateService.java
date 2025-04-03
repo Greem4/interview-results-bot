@@ -3,13 +3,18 @@ package ru.greemlab.interviewresultsbot.service;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Сервис управления состояниями пользователей
+ */
 @Service
 public class UserStateService {
 
+    /**
+     * Состояния диалога с пользователем
+     */
     public enum UserState {
         START,
         WAITING_RESPONSIBILITY,
@@ -19,36 +24,74 @@ public class UserStateService {
         FINISHED
     }
 
+    /**
+     * Внутренний класс для хранения данных сессии пользователя
+     */
     @Getter
     @Setter
     public static class UserSession {
         private UserState state = UserState.START;
-        private String candidateKey; // "victoria" / "alexander" / "svetlana" / null
+        private String candidateKey;
     }
 
-    private final Map<Long, UserSession> userSessions = new HashMap<>();
+    private final Map<Long, UserSession> userSessions = new ConcurrentHashMap<>();
 
-    private UserSession getUserSession(Long chatId) {
-        return userSessions.computeIfAbsent(chatId, c -> new UserSession());
+    /**
+     * Сброс состояния конкретного пользователя
+     * @param chatId ID чата пользователя
+     */
+    public void resetState(Long chatId) {
+        UserSession session = userSessions.get(chatId);
+        if (session != null) {
+            session.setState(UserState.START);
+            session.setCandidateKey(null);
+        }
     }
 
+    /**
+     * Получение текущего состояния пользователя
+     * @param chatId ID чата пользователя
+     * @return Текущее состояние
+     */
     public UserState getState(Long chatId) {
-        return getUserSession(chatId).getState();
+        return getOrCreateSession(chatId).getState();
     }
 
+    /**
+     * Установка нового состояния
+     * @param chatId ID чата пользователя
+     * @param state Новое состояние
+     */
     public void setState(Long chatId, UserState state) {
-        getUserSession(chatId).setState(state);
+        getOrCreateSession(chatId).setState(state);
     }
 
+    /**
+     * Получение выбранного кандидата
+     * @param chatId ID чата пользователя
+     * @return Ключ выбранного кандидата
+     */
     public String getCandidate(Long chatId) {
-        return getUserSession(chatId).getCandidateKey();
+        return getOrCreateSession(chatId).getCandidateKey();
     }
 
+    /**
+     * Установка выбранного кандидата
+     * @param chatId ID чата пользователя
+     * @param candidateKey Ключ кандидата
+     */
     public void setCandidate(Long chatId, String candidateKey) {
-        getUserSession(chatId).setCandidateKey(candidateKey);
+        getOrCreateSession(chatId).setCandidateKey(candidateKey);
     }
 
+    /**
+     * Сброс всех сессий
+     */
     public void resetAllSessions() {
         userSessions.clear();
+    }
+
+    private UserSession getOrCreateSession(Long chatId) {
+        return userSessions.computeIfAbsent(chatId, k -> new UserSession());
     }
 }
