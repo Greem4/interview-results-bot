@@ -51,8 +51,10 @@ public class KeyboardFactory {
      */
     public static InlineKeyboardMarkup buildInviteKeyboard() {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(createButton("✅ Да", CallbackCommands.INVITE_YES),
-                createButton("❌ Нет", CallbackCommands.INVITE_NO)));
+        rows.add(List.of(
+                createButton("✅ Да", CallbackCommands.INVITE_YES),
+                createButton("❌ Нет", CallbackCommands.INVITE_NO)
+        ));
         return InlineKeyboardMarkup.builder().keyboard(rows).build();
     }
 

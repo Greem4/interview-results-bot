@@ -12,8 +12,8 @@ import static ru.greemlab.interviewresultsbot.service.UserStateService.UserState
 
 /**
  * Основная логика «диалога» и «состояний» вынесена сюда:
- * 1. processTextMessage() – реакции на обычные сообщения (ввод пользователя).
- * 2. processCallbackQuery() – реакции на нажатие кнопок (callback data).
+ * 1. processTextMessage() – реакции на обычные сообщения.
+ * 2. processCallbackQuery() – реакции на нажатие inline-кнопок.
  */
 @Slf4j
 @Service
@@ -46,7 +46,7 @@ public class DialogStateMachineService {
         final Integer messageId = callbackQuery.getMessage().getMessageId();
         final String data = callbackQuery.getData();
 
-        // Либо обработка «служебных» кнопок (статистика, архив)
+        // «Служебные» кнопки (статистика, архив)
         if (CallbackCommands.ARCHIVE.equals(data)) {
             bot.editMessage(chatId, messageId, archiveCandidatesService.getArchiveSummary(), null);
             return;
@@ -56,20 +56,23 @@ public class DialogStateMachineService {
             return;
         }
 
-        // Либо логика пошагового заполнения
+        // Логика пошагового заполнения
         final UserState currentState = userStateService.getState(chatId);
         switch (currentState) {
             case START -> handleCandidateSelection(bot, chatId, messageId, data);
-            case WAITING_RESPONSIBILITY -> handleRatingSelection(bot, chatId, messageId, data, CallbackCommands.RESP_PREFIX, UserState.WAITING_INTEREST);
-            case WAITING_INTEREST -> handleRatingSelection(bot, chatId, messageId, data, CallbackCommands.INTR_PREFIX, UserState.WAITING_RESULT_FOCUS);
-            case WAITING_RESULT_FOCUS -> handleRatingSelection(bot, chatId, messageId, data, CallbackCommands.RESF_PREFIX, UserState.WAITING_INVITE);
+            case WAITING_RESPONSIBILITY -> handleRatingSelection(bot, chatId, messageId, data,
+                    CallbackCommands.RESP_PREFIX, UserState.WAITING_INTEREST);
+            case WAITING_INTEREST -> handleRatingSelection(bot, chatId, messageId, data,
+                    CallbackCommands.INTR_PREFIX, UserState.WAITING_RESULT_FOCUS);
+            case WAITING_RESULT_FOCUS -> handleRatingSelection(bot, chatId, messageId, data,
+                    CallbackCommands.RESF_PREFIX, UserState.WAITING_INVITE);
             case WAITING_INVITE -> handleInvitationDecision(bot, chatId, messageId, data);
             default ->
                     log.warn("Непредусмотренное состояние диалога: {} (chatId={})", currentState, chatId);
         }
     }
 
-    /** ====================== Методы для обработки /start, /restart и прочих команд ======================== */
+    /** ====================== Методы для /start, /restart ======================== */
 
     private void handleStartCommand(CandidateEvaluationBot bot, Long chatId) {
         userStateService.resetState(chatId);
@@ -98,9 +101,10 @@ public class DialogStateMachineService {
         );
     }
 
-    /* ====================== Логика обработки выбора кандидата и оценок ======================== */
+    /* ====================== Логика выбора кандидата и оценок ======================== */
 
-    private void handleCandidateSelection(CandidateEvaluationBot bot, Long chatId, Integer messageId, String data) {
+    private void handleCandidateSelection(CandidateEvaluationBot bot, Long chatId,
+                                          Integer messageId, String data) {
         if (!CandidateConstants.ALL.contains(data)) {
             log.warn("Получен невалидный кандидат: {} (chatId={})", data, chatId);
             return;
@@ -151,7 +155,7 @@ public class DialogStateMachineService {
             default -> log.warn("Неизвестный тип оценки: {}", expectedPrefix);
         }
 
-        // Определяем следующий шаг
+        // Следующий шаг
         userStateService.setState(chatId, nextState);
 
         final String nextText;
@@ -177,7 +181,8 @@ public class DialogStateMachineService {
         bot.editMessage(chatId, messageId, nextText, nextKeyboard);
     }
 
-    private void handleInvitationDecision(CandidateEvaluationBot bot, Long chatId, Integer messageId, String data) {
+    private void handleInvitationDecision(CandidateEvaluationBot bot, Long chatId,
+                                          Integer messageId, String data) {
         if (!data.equals(CallbackCommands.INVITE_YES) && !data.equals(CallbackCommands.INVITE_NO)) {
             log.warn("Неизвестная кнопка на шаге INVITE: {} (chatId={})", data, chatId);
             return;
@@ -190,7 +195,7 @@ public class DialogStateMachineService {
             voteStatisticsService.addInviteNo(candidateKey);
         }
 
-        // Завершаем текущую «сессию»
+        // Завершаем сессию
         final String stats = voteStatisticsService.getCandidateStatistics(candidateKey);
         final String msg = String.format(
                 "✅ Спасибо за оценку!\n\n📊 Статистика по кандидату %s:\n%s\n─────────────────────",
@@ -205,6 +210,7 @@ public class DialogStateMachineService {
         userStateService.setCandidate(chatId, null);
 
         // Предлагаем начать заново
-        bot.sendTextMessage(chatId, "🔄 Для нового голосования введите /start", KeyboardFactory.buildMainMenuKeyboard());
+        bot.sendTextMessage(chatId, "🔄 Для нового голосования введите /start",
+                KeyboardFactory.buildMainMenuKeyboard());
     }
 }
