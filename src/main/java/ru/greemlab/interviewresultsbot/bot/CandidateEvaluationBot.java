@@ -31,6 +31,7 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
     private static final String CANDIDATE_ALEXANDER = "alexander";
     private static final String CANDIDATE_SVETLANA = "svetlana";
 
+    private static final String CURRENT_STATS_CALLBACK = "current_stats";
     private static final String ARCHIVE_CALLBACK = "archive";
 
     @Value("${app.bot.username}")
@@ -63,6 +64,10 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
                     "Добро пожаловать! Выберите кандидата для оценки или посмотрите архив:",
                     makeStartButtons()
             );
+        } else if (text.equals("/restart")) {
+            userStateService.resetAllSessions();
+            voteStatisticsService.resetStatistic();
+            sendMessage(chatId, "✅ Все данные сброшены. Начните заново с /start.", null);
         } else {
             sendMessage(chatId, "Введите /start, чтобы начать.", null);
         }
@@ -86,6 +91,12 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
         if (data.equals(ARCHIVE_CALLBACK)) {
             String archiveText = archiveCandidatesService.getArchiveSummary();
             editMessageText(chatId, messageId, archiveText, null);
+            return;
+        }
+
+        if (data.equals(CURRENT_STATS_CALLBACK)) {
+            var statsText = voteStatisticsService.getAllCandidatesStatistics();
+            editMessageText(chatId, messageId, statsText, null);
             return;
         }
 
@@ -184,22 +195,26 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
 
     // Фабрика стартовых кнопок
     private InlineKeyboardMarkup makeStartButtons() {
-        InlineKeyboardButton btnVictoria = new InlineKeyboardButton("Виктория");
+        var btnVictoria = new InlineKeyboardButton("Виктория");
         btnVictoria.setCallbackData(CANDIDATE_VICTORIA);
 
-        InlineKeyboardButton btnSvetlana = new InlineKeyboardButton("Светлана");
+        var btnSvetlana = new InlineKeyboardButton("Светлана");
         btnSvetlana.setCallbackData(CANDIDATE_SVETLANA);
 
-        InlineKeyboardButton btnAlexander = new InlineKeyboardButton("Александр");
+        var btnAlexander = new InlineKeyboardButton("Александр");
         btnAlexander.setCallbackData(CANDIDATE_ALEXANDER);
 
-        InlineKeyboardButton btnArchive = new InlineKeyboardButton("Архив соискателей");
+        var btnCurrentsStats = new InlineKeyboardButton("Текущие кандидаты");
+        btnCurrentsStats.setCallbackData(CURRENT_STATS_CALLBACK);
+
+        var btnArchive = new InlineKeyboardButton("Архив соискателей");
         btnArchive.setCallbackData(ARCHIVE_CALLBACK);
 
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
         keyboard.add(List.of(btnVictoria));
         keyboard.add(List.of(btnSvetlana));
         keyboard.add(List.of(btnAlexander));
+        keyboard.add(List.of(btnCurrentsStats));
         keyboard.add(List.of(btnArchive));
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();

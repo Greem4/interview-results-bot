@@ -11,17 +11,17 @@ public class VoteStatisticsService {
 
     public static class CandidateStats {
 
-        private AtomicInteger totalResponsibility = new AtomicInteger(0);
-        private AtomicInteger countResponsibility = new AtomicInteger(0);
+        private final AtomicInteger totalResponsibility = new AtomicInteger(0);
+        private final AtomicInteger countResponsibility = new AtomicInteger(0);
 
-        private AtomicInteger totalInterest = new AtomicInteger(0);
-        private AtomicInteger countInterest = new AtomicInteger(0);
+        private final AtomicInteger totalInterest = new AtomicInteger(0);
+        private final AtomicInteger countInterest = new AtomicInteger(0);
 
-        private AtomicInteger totalResultFocus = new AtomicInteger(0);
-        private AtomicInteger countResultFocus = new AtomicInteger(0);
+        private final AtomicInteger totalResultFocus = new AtomicInteger(0);
+        private final AtomicInteger countResultFocus = new AtomicInteger(0);
 
-        private AtomicInteger yesCount = new AtomicInteger(0);
-        private AtomicInteger noCount = new AtomicInteger(0);
+        private final AtomicInteger yesCount = new AtomicInteger(0);
+        private final AtomicInteger noCount = new AtomicInteger(0);
 
         public void addResponsibility(int score) {
             totalResponsibility.addAndGet(score);
@@ -67,6 +67,24 @@ public class VoteStatisticsService {
         }
     }
 
+    public void resetStatistic() {
+        statsMap.clear();
+    }
+
+    public String getAllCandidatesStatistics() {
+        if (statsMap.isEmpty()) {
+            return "Статистика по кандидатам отсутствует.";
+        }
+        var sb = new StringBuilder();
+        statsMap.forEach((key, stats) -> {
+            var name = convertKeyName(key);
+            sb.append("Кандидат: ").append(name).append("\n")
+                    .append(stats.getStatsText())
+                    .append("\n");
+        });
+        return sb.toString();
+    }
+
     // Храним статистику для каждого кандидата по имени (ключ)
     private final Map<String, CandidateStats> statsMap = new HashMap<>();
 
@@ -102,5 +120,14 @@ public class VoteStatisticsService {
         } else {
             return stats.getStatsText();
         }
+    }
+
+    private String convertKeyName(String key) {
+        return switch (key) {
+            case "victoria" -> "Виктория";
+            case "alexander" -> "Александр";
+            case "svetlana" -> "Светлана";
+            default -> "Неизвестный кандидат";
+        };
     }
 }

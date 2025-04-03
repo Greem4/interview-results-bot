@@ -24,7 +24,6 @@ public class UserStateService {
     public static class UserSession {
         private UserState state = UserState.START;
         private String candidateKey; // "victoria" / "alexander" / "svetlana" / null
-
     }
 
     private final Map<Long, UserSession> userSessions = new HashMap<>();
@@ -47,5 +46,9 @@ public class UserStateService {
 
     public void setCandidate(Long chatId, String candidateKey) {
         getUserSession(chatId).setCandidateKey(candidateKey);
+    }
+
+    public void resetAllSessions() {
+        userSessions.clear();
     }
 }
