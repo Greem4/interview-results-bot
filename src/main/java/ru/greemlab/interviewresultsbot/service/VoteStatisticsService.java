@@ -47,22 +47,21 @@ public class VoteStatisticsService {
         }
 
         public String getStatsText() {
-            double avgResp = countResponsibility.get() == 0 ? 0
-                    : (double) totalResponsibility.get() / countResponsibility.get();
-            double avgInt = countInterest.get() == 0 ? 0
-                    : (double) totalInterest.get() / countInterest.get();
-            double avgResFocus = countResultFocus.get() == 0 ? 0
-                    : (double) totalResultFocus.get() / countResultFocus.get();
-
             return String.format(
-                    "Ответственность: средний балл = %.2f (голосов: %d)\n" +
-                    "Интерес к делу: средний балл = %.2f (голосов: %d)\n" +
-                    "Направленность на результат: средний балл = %.2f (голосов: %d)\n" +
-                    "Пригласили на работу:\n Да = %d, Нет = %d\n",
-                    avgResp, countResponsibility.get(),
-                    avgInt, countInterest.get(),
-                    avgResFocus, countResultFocus.get(),
-                    yesCount.get(), noCount.get()
+                    "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    + "┫ 📈 Статистика:\n"
+                    + "┣────────────────────────────\n"
+                    + "┃ Ответственность: %s\n"
+                    + "┃ Интерес к делу: %s\n"
+                    + "┃ Направленность на результат: %s\n"
+                    + "┣────────────────────────────\n"
+                    + "┃ Приглашения: ✅ %d | ❌ %d\n"
+                    + "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                    formatScore(countResponsibility.get(), totalResponsibility.get()),
+                    formatScore(countInterest.get(), totalInterest.get()),
+                    formatScore(countResultFocus.get(), totalResultFocus.get()),
+                    yesCount.get(),
+                    noCount.get()
             );
         }
     }
@@ -72,16 +71,14 @@ public class VoteStatisticsService {
     }
 
     public String getAllCandidatesStatistics() {
-        if (statsMap.isEmpty()) {
-            return "Статистика по кандидатам отсутствует.";
-        }
-        var sb = new StringBuilder();
-        statsMap.forEach((key, stats) -> {
-            var name = convertKeyName(key);
-            sb.append("Кандидат: ").append(name).append("\n")
-                    .append(stats.getStatsText())
-                    .append("\n");
-        });
+        if (statsMap.isEmpty()) return "📭 Нет данных о голосованиях";
+
+        StringBuilder sb = new StringBuilder("📊 Текущая статистика:\n\n");
+        statsMap.forEach((key, stats) ->
+                sb.append("▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄\n")
+                        .append("👤 Кандидат: ").append(convertKeyName(key)).append("\n")
+                        .append(stats.getStatsText()).append("\n\n")
+        );
         return sb.toString();
     }
 
@@ -120,6 +117,11 @@ public class VoteStatisticsService {
         } else {
             return stats.getStatsText();
         }
+    }
+
+    private static String formatScore(int count, int total) {
+        return count == 0 ? "нет оценок" :
+                String.format("%.2f (голосов: %d)", (double) total / count, count);
     }
 
     private String convertKeyName(String key) {

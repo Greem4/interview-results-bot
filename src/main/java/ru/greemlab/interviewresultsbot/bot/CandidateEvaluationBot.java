@@ -30,7 +30,6 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
     private static final String CANDIDATE_VICTORIA = "victoria";
     private static final String CANDIDATE_ALEXANDER = "alexander";
     private static final String CANDIDATE_SVETLANA = "svetlana";
-
     private static final String CURRENT_STATS_CALLBACK = "current_stats";
     private static final String ARCHIVE_CALLBACK = "archive";
 
@@ -61,20 +60,19 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
             userStateService.setCandidate(chatId, null);
             sendMessage(
                     chatId,
-                    "Добро пожаловать! Выберите кандидата для оценки или посмотрите архив:",
+                    "🌟 Добро пожаловать! Выберите действие:",
                     makeStartButtons()
             );
         } else if (text.equals("/restart")) {
             userStateService.resetAllSessions();
             voteStatisticsService.resetStatistic();
-            sendMessage(chatId, "✅ Все данные сброшены. Начните заново с /start.", null);
+            sendMessage(chatId, "🔄 Все данные сброшены. Начните заново с /start.", null);
         } else {
-            sendMessage(chatId, "Введите /start, чтобы начать.", null);
+            sendMessage(chatId, "ℹ Введите /start, чтобы начать.", null);
         }
     }
 
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
-        // Отвечаем на callback, чтобы убрать "часики"
         try {
             execute(new AnswerCallbackQuery(callbackQuery.getId()));
         } catch (Exception e) {
@@ -85,214 +83,181 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
         Long chatId = callbackQuery.getMessage().getChatId();
         Integer messageId = callbackQuery.getMessage().getMessageId();
 
-        UserState currentState = userStateService.getState(chatId);
-
-        // Если нажали "Архив соискателей"
+        // Обработка общих кнопок
         if (data.equals(ARCHIVE_CALLBACK)) {
-            String archiveText = archiveCandidatesService.getArchiveSummary();
-            editMessageText(chatId, messageId, archiveText, null);
+            editMessageText(chatId, messageId, archiveCandidatesService.getArchiveSummary(), null);
             return;
         }
-
         if (data.equals(CURRENT_STATS_CALLBACK)) {
-            var statsText = voteStatisticsService.getAllCandidatesStatistics();
-            editMessageText(chatId, messageId, statsText, null);
+            editMessageText(chatId, messageId, voteStatisticsService.getAllCandidatesStatistics(), null);
             return;
         }
 
+        // Обработка состояний
+        UserState currentState = userStateService.getState(chatId);
         switch (currentState) {
-            case START:
-                if (data.equals(CANDIDATE_VICTORIA) ||
-                    data.equals(CANDIDATE_ALEXANDER) ||
-                    data.equals(CANDIDATE_SVETLANA)) {
-
-                    userStateService.setCandidate(chatId, data);
-                    userStateService.setState(chatId, UserState.WAITING_RESPONSIBILITY);
-
-                    String candidateName = convertKeyToName(data);
-                    editMessageText(
-                            chatId,
-                            messageId,
-                            "Вы выбрали кандидата: " + candidateName +
-                            "\n\nОцените ответственность (1..5):",
-                            makeScoreButtons("RESP_")
-                    );
-                }
-                break;
-
-            case WAITING_RESPONSIBILITY:
-                if (data.startsWith("RESP_")) {
-                    int score = Integer.parseInt(data.substring("RESP_".length()));
-                    String cKey = userStateService.getCandidate(chatId);
-                    voteStatisticsService.addResponsibility(cKey, score);
-
-                    userStateService.setState(chatId, UserState.WAITING_INTEREST);
-                    editMessageText(chatId, messageId,
-                            "Оцените интерес к делу (1..5):",
-                            makeScoreButtons("INTR_"));
-                }
-                break;
-
-            case WAITING_INTEREST:
-                if (data.startsWith("INTR_")) {
-                    int score = Integer.parseInt(data.substring("INTR_".length()));
-                    String cKey = userStateService.getCandidate(chatId);
-                    voteStatisticsService.addInterest(cKey, score);
-
-                    userStateService.setState(chatId, UserState.WAITING_RESULT_FOCUS);
-                    editMessageText(chatId, messageId,
-                            "Оцените направленность на результат (1..5):",
-                            makeScoreButtons("RESF_"));
-                }
-                break;
-
-            case WAITING_RESULT_FOCUS:
-                if (data.startsWith("RESF_")) {
-                    int score = Integer.parseInt(data.substring("RESF_".length()));
-                    String cKey = userStateService.getCandidate(chatId);
-                    voteStatisticsService.addResultFocus(cKey, score);
-
-                    userStateService.setState(chatId, UserState.WAITING_INVITE);
-                    editMessageText(chatId, messageId,
-                            "Пригласили ли Вы данного кандидата на работу?",
-                            makeInviteButtons());
-                }
-                break;
-
-            case WAITING_INVITE:
-                if (data.equals("INVITE_YES") || data.equals("INVITE_NO")) {
-                    String cKey = userStateService.getCandidate(chatId);
-                    if (data.equals("INVITE_YES")) {
-                        voteStatisticsService.addInviteYes(cKey);
-                    } else {
-                        voteStatisticsService.addInviteNo(cKey);
-                    }
-
-                    // Получаем статистику и формируем итоговое сообщение
-                    String stats = voteStatisticsService.getCandidateStatistics(cKey);
-                    String finalText = "Спасибо за вашу оценку!\n\nСтатистика по кандидату:\n"
-                                       + convertKeyToName(cKey) + "\n\n"
-                                       + stats;
-                    // Отредактируем сообщение с результатами
-                    editMessageText(chatId, messageId, finalText, null);
-
-                    // Сбрасываем состояние в старт, чтобы новые нажатия обрабатывались
-                    userStateService.setState(chatId, UserState.START);
-                    userStateService.setCandidate(chatId, null);
-
-                    // Отправляем новое сообщение со стартовыми кнопками
-                    sendMessage(chatId, "Для нового голосования введите /start или нажмите кнопку ниже:",
-                            makeStartButtons());
-                }
-                break;
-
-            case FINISHED:
-            default:
-                // Игнорируем любые другие нажатия
-                break;
+            case START -> handleStartState(chatId, messageId, data);
+            case WAITING_RESPONSIBILITY -> handleResponsibilityState(chatId, messageId, data);
+            case WAITING_INTEREST -> handleInterestState(chatId, messageId, data);
+            case WAITING_RESULT_FOCUS -> handleResultFocusState(chatId, messageId, data);
+            case WAITING_INVITE -> handleInviteState(chatId, messageId, data);
         }
     }
 
-    // Фабрика стартовых кнопок
-    private InlineKeyboardMarkup makeStartButtons() {
-        var btnVictoria = new InlineKeyboardButton("Виктория");
-        btnVictoria.setCallbackData(CANDIDATE_VICTORIA);
-
-        var btnSvetlana = new InlineKeyboardButton("Светлана");
-        btnSvetlana.setCallbackData(CANDIDATE_SVETLANA);
-
-        var btnAlexander = new InlineKeyboardButton("Александр");
-        btnAlexander.setCallbackData(CANDIDATE_ALEXANDER);
-
-        var btnCurrentsStats = new InlineKeyboardButton("Текущие кандидаты");
-        btnCurrentsStats.setCallbackData(CURRENT_STATS_CALLBACK);
-
-        var btnArchive = new InlineKeyboardButton("Архив соискателей");
-        btnArchive.setCallbackData(ARCHIVE_CALLBACK);
-
-        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
-        keyboard.add(List.of(btnVictoria));
-        keyboard.add(List.of(btnSvetlana));
-        keyboard.add(List.of(btnAlexander));
-        keyboard.add(List.of(btnCurrentsStats));
-        keyboard.add(List.of(btnArchive));
-
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(keyboard);
-        return markup;
+    private void handleStartState(Long chatId, Integer messageId, String data) {
+        if (List.of(CANDIDATE_VICTORIA, CANDIDATE_ALEXANDER, CANDIDATE_SVETLANA).contains(data)) {
+            userStateService.setCandidate(chatId, data);
+            userStateService.setState(chatId, UserState.WAITING_RESPONSIBILITY);
+            editMessageText(
+                    chatId,
+                    messageId,
+                    "📝 Вы выбрали: " + convertKeyToName(data) + "\n\n"
+                    + "➡ Шаг 1/4: Оцените ответственность (1-5):",
+                    makeScoreButtons("RESP_")
+            );
+        }
     }
 
-    // Фабрика кнопок-оценок (1..5)
+    private void handleResponsibilityState(Long chatId, Integer messageId, String data) {
+        if (data.startsWith("RESP_")) {
+            processScore(chatId, data.substring(5), "RESP");
+            editMessageText(
+                    chatId,
+                    messageId,
+                    "➡ Шаг 2/4: Оцените интерес к делу (1-5):",
+                    makeScoreButtons("INTR_")
+            );
+            userStateService.setState(chatId, UserState.WAITING_INTEREST);
+        }
+    }
+
+    private void handleInterestState(Long chatId, Integer messageId, String data) {
+        if (data.startsWith("INTR_")) {
+            processScore(chatId, data.substring(5), "INTR");
+            editMessageText(
+                    chatId,
+                    messageId,
+                    "➡ Шаг 3/4: Оцените направленность на результат (1-5):",
+                    makeScoreButtons("RESF_")
+            );
+            userStateService.setState(chatId, UserState.WAITING_RESULT_FOCUS);
+        }
+    }
+
+    private void handleResultFocusState(Long chatId, Integer messageId, String data) {
+        if (data.startsWith("RESF_")) {
+            processScore(chatId, data.substring(5), "RESF");
+            editMessageText(
+                    chatId,
+                    messageId,
+                    "➡ Шаг 4/4: Пригласили ли Вы данного кандидата на работу?",
+                    makeInviteButtons()
+            );
+            userStateService.setState(chatId, UserState.WAITING_INVITE);
+        }
+    }
+
+    private void handleInviteState(Long chatId, Integer messageId, String data) {
+        if (data.equals("INVITE_YES") || data.equals("INVITE_NO")) {
+            String cKey = userStateService.getCandidate(chatId);
+            if (data.equals("INVITE_YES")) voteStatisticsService.addInviteYes(cKey);
+            else voteStatisticsService.addInviteNo(cKey);
+
+            String finalText = "✅ Спасибо за оценку!\n\n"
+                               + "📊 Статистика по кандидату " + convertKeyToName(cKey) + ":\n"
+                               + voteStatisticsService.getCandidateStatistics(cKey)
+                               + "\n─────────────────────";
+
+            editMessageText(chatId, messageId, finalText, null);
+            resetUserSession(chatId);
+            sendMessage(chatId, "🔄 Для нового голосования введите /start", makeStartButtons());
+        }
+    }
+
+    private void processScore(Long chatId, String scoreStr, String type) {
+        String cKey = userStateService.getCandidate(chatId);
+        int score = Integer.parseInt(scoreStr);
+        switch (type) {
+            case "RESP" -> voteStatisticsService.addResponsibility(cKey, score);
+            case "INTR" -> voteStatisticsService.addInterest(cKey, score);
+            case "RESF" -> voteStatisticsService.addResultFocus(cKey, score);
+        }
+    }
+
+    private void resetUserSession(Long chatId) {
+        userStateService.setState(chatId, UserState.START);
+        userStateService.setCandidate(chatId, null);
+    }
+
+    private InlineKeyboardMarkup makeStartButtons() {
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+
+        // Кнопки кандидатов
+        keyboard.add(List.of(createButton("Виктория 🧑💼", CANDIDATE_VICTORIA)));
+        keyboard.add(List.of(createButton("Светлана 👩💻", CANDIDATE_SVETLANA)));
+        keyboard.add(List.of(createButton("Александр 👨🔧", CANDIDATE_ALEXANDER)));
+
+        // Сервисные кнопки
+        keyboard.add(List.of(
+                createButton("📊 Текущая статистика", CURRENT_STATS_CALLBACK),
+                createButton("📁 Архив", ARCHIVE_CALLBACK)
+        ));
+
+        return new InlineKeyboardMarkup(keyboard);
+    }
+
+    private InlineKeyboardButton createButton(String text, String callback) {
+        InlineKeyboardButton button = new InlineKeyboardButton(text);
+        button.setCallbackData(callback);
+        return button;
+    }
+
     private InlineKeyboardMarkup makeScoreButtons(String prefix) {
         List<InlineKeyboardButton> row = new ArrayList<>();
         for (int i = 1; i <= 5; i++) {
-            InlineKeyboardButton btn = new InlineKeyboardButton(String.valueOf(i));
-            btn.setCallbackData(prefix + i);
-            row.add(btn);
+            row.add(createButton("⭐ " + i, prefix + i));
         }
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(List.of(row));
-        return markup;
+        return new InlineKeyboardMarkup(List.of(row));
     }
 
-    // Фабрика кнопок "Да"/"Нет"
     private InlineKeyboardMarkup makeInviteButtons() {
-        InlineKeyboardButton yesBtn = new InlineKeyboardButton("Да");
-        yesBtn.setCallbackData("INVITE_YES");
-
-        InlineKeyboardButton noBtn = new InlineKeyboardButton("Нет");
-        noBtn.setCallbackData("INVITE_NO");
-
-        List<InlineKeyboardButton> row = List.of(yesBtn, noBtn);
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(List.of(row));
-        return markup;
+        return new InlineKeyboardMarkup(List.of(
+                List.of(createButton("✅ Да", "INVITE_YES")),
+                List.of(createButton("❌ Нет", "INVITE_NO"))
+        ));
     }
 
-    // Преобразуем ключ в отображаемое имя
     private String convertKeyToName(String key) {
-        switch (key) {
-            case CANDIDATE_VICTORIA:
-                return "Виктория";
-            case CANDIDATE_SVETLANA:
-                return "Светлана";
-            case CANDIDATE_ALEXANDER:
-                return "Александр";
-            default:
-                return "Неизвестно";
-        }
+        return switch (key) {
+            case CANDIDATE_VICTORIA -> "Виктория 🧑💼";
+            case CANDIDATE_SVETLANA -> "Светлана 👩💻";
+            case CANDIDATE_ALEXANDER -> "Александр 👨🔧";
+            default -> "Неизвестный кандидат";
+        };
     }
 
-    // Отправка нового сообщения
     private void sendMessage(Long chatId, String text, InlineKeyboardMarkup replyMarkup) {
-        SendMessage msg = new SendMessage();
-        msg.setChatId(chatId.toString());
-        msg.setText(text);
-        if (replyMarkup != null) {
-            msg.setReplyMarkup(replyMarkup);
-        }
         try {
-            execute(msg);
+            execute(SendMessage.builder()
+                    .chatId(chatId.toString())
+                    .text(text)
+                    .replyMarkup(replyMarkup)
+                    .build());
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    // Редактирование существующего сообщения
     private void editMessageText(Long chatId, Integer messageId, String newText, InlineKeyboardMarkup markup) {
-        EditMessageText edit = new EditMessageText();
-        edit.setChatId(chatId.toString());
-        edit.setMessageId(messageId);
-        edit.setText(newText);
-        if (markup != null) {
-            edit.setReplyMarkup(markup);
-        }
         try {
-            execute(edit);
+            execute(EditMessageText.builder()
+                    .chatId(chatId.toString())
+                    .messageId(messageId)
+                    .text(newText)
+                    .replyMarkup(markup)
+                    .build());
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 }
-

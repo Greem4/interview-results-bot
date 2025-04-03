@@ -70,21 +70,14 @@ public class ArchiveCandidatesService {
      * Вернёт текстовую сводку по всем архивным кандидатам.
      */
     public String getArchiveSummary() {
-        if (archiveMap.isEmpty()) {
-            return "Архив соискателей пока пуст.";
-        }
+        if (archiveMap.isEmpty()) return "📭 Архив пуст";
 
-        // Формируем человекочитаемую статистику
-        StringBuilder sb = new StringBuilder("АРХИВ СОИСКАТЕЛЕЙ:\n\n");
-        int idx = 1;
-        for (Map.Entry<String, VoteStatisticsService.CandidateStats> entry : archiveMap.entrySet()) {
-            String candidateName = entry.getKey();
-            VoteStatisticsService.CandidateStats stats = entry.getValue();
-            sb.append(String.format("%d) %s\n", idx, candidateName));
-            sb.append(stats.getStatsText()); // уже готовый метод, выводит "Ответственность, Интерес, ... Да/Нет..."
-            sb.append("\n");
-            idx++;
-        }
+        StringBuilder sb = new StringBuilder("📁 Архив соискателей:\n\n");
+        archiveMap.forEach((name, stats) ->
+                sb.append("▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄\n")
+                        .append("👤 Кандидат: ").append(name).append("\n")
+                        .append(stats.getStatsText()).append("\n\n")
+        );
         return sb.toString();
     }
 }
