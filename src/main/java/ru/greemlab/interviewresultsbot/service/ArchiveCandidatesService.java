@@ -7,17 +7,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Сервис работы с архивными данными кандидатов.
- * В реальном приложении вы можете хранить это в БД.
+ * «Архив» уже обработанных кандидатов (пример).
+ * В реальном случае это может быть БД.
  */
 @Service
 public class ArchiveCandidatesService {
 
     private final Map<String, VoteStatisticsService.CandidateStats> archive = new ConcurrentHashMap<>();
 
-    /**
-     * Пример инициализации демо-данных в архиве.
-     */
     @PostConstruct
     public void init() {
         addSampleCandidate("Петров П.П.", new int[]{4, 5}, new int[]{4, 3}, new int[]{5, 5}, 2, 0);

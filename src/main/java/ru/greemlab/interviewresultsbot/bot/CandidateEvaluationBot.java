@@ -7,37 +7,27 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import ru.greemlab.interviewresultsbot.service.DialogStateMachineService;
 
-/**
- * Telegram-бот для оценки кандидатов.
- * Здесь «точка входа», которая принимает Update, а всю логику
- * диалога и состояний отправляет в DialogStateMachineService.
- */
 @Slf4j
 @Getter
 @Component
 public class CandidateEvaluationBot extends TelegramLongPollingBot {
 
-    // Эти поля инициализируем вручную в конструкторе
     private final String botUsername;
     private final String botToken;
     private final DialogStateMachineService dialogStateMachineService;
 
-    /**
-     * Дополнительный конструктор, позволяющий передать DefaultBotOptions
-     * с настроенным пулом потоков (setMaxThreads).
-     */
     public CandidateEvaluationBot(
             @Value("${app.bot.username}") String botUsername,
             @Value("${app.bot.token}") String botToken,
             DefaultBotOptions options,
             DialogStateMachineService dialogStateMachineService
     ) {
-        // передаём options в родительский конструктор
         super(options);
         this.botUsername = botUsername;
         this.botToken = botToken;
@@ -46,12 +36,11 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        // Весь «груз» обработки уходит в dialogStateMachineService
         try {
             if (update.hasCallbackQuery()) {
                 // Callback запрос (клик по inline-кнопке)
                 final var callbackQuery = update.getCallbackQuery();
-                // Telegram требует присылать AnswerCallbackQuery, чтобы «убрать» часики
+                // Убираем "часики" на нажатой кнопке
                 execute(AnswerCallbackQuery.builder()
                         .callbackQueryId(callbackQuery.getId())
                         .build());
@@ -65,23 +54,26 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
     }
 
     /**
-     * Утилитный метод: отправка обычного сообщения в чат
+     * Утилитный метод: отправка нового сообщения в чат.
      */
-    public void sendTextMessage(Long chatId, String text,
-                                org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup keyboard) {
+    public Integer sendTextMessage(Long chatId, String text,
+                                   org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup keyboard) {
         try {
-            execute(SendMessage.builder()
+            var send = SendMessage.builder()
                     .chatId(chatId.toString())
                     .text(text)
                     .replyMarkup(keyboard)
-                    .build());
+                    .build();
+            var msg = execute(send);
+            return msg.getMessageId(); // Возвращаем ID отправленного сообщения
         } catch (Exception e) {
             log.error("Ошибка при отправке сообщения: {}", e.getMessage(), e);
         }
+        return null;
     }
 
     /**
-     * Утилитный метод: редактирование существующего сообщения
+     * Редактирование существующего сообщения (меняем текст и/или клавиатуру).
      */
     public void editMessage(Long chatId, Integer messageId, String newText,
                             org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup keyboard) {
@@ -94,6 +86,20 @@ public class CandidateEvaluationBot extends TelegramLongPollingBot {
                     .build());
         } catch (Exception e) {
             log.error("Ошибка при редактировании сообщения: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Удаление сообщения из чата по его ID.
+     */
+    public void deleteMessage(Long chatId, Integer messageId) {
+        try {
+            execute(DeleteMessage.builder()
+                    .chatId(chatId.toString())
+                    .messageId(messageId)
+                    .build());
+        } catch (Exception e) {
+            log.error("Ошибка при удалении сообщения: {}", e.getMessage(), e);
         }
     }
 }

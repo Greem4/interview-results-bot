@@ -7,13 +7,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Сервис сбора и анализа статистики.
+ * Сервис сбора и анализа статистики по кандидатам.
  */
 @Service
 public class VoteStatisticsService {
 
     /**
-     * Класс, хранящий статистику по конкретному кандидату.
+     * Вложенный класс: хранит суммарные оценки и счётчики.
      */
     public static class CandidateStats {
         private final AtomicInteger totalResponsibility = new AtomicInteger(0);
@@ -51,21 +51,18 @@ public class VoteStatisticsService {
             noCount.incrementAndGet();
         }
 
-        /**
-         * Возвращает строку со средними оценками и кол-вом голосов.
-         */
         public String getStatsText() {
             return String.format(
                     """
-                            
-                             📈 Статистика:
-                            
-                             Ответственность: %s
-                             Интерес: %s
-                             Результативность: %s
-                            
-                             Приглашения: ✅ %d | ❌ %d
-                            """,
+                    
+                    📈 Статистика:
+                    
+                    Ответственность: %s
+                    Интерес: %s
+                    Результативность: %s
+                    
+                    Приглашения: ✅ %d | ❌ %d
+                    """,
                     formatScore(countResponsibility.get(), totalResponsibility.get()),
                     formatScore(countInterest.get(), totalInterest.get()),
                     formatScore(countResultFocus.get(), totalResultFocus.get()),
@@ -84,12 +81,15 @@ public class VoteStatisticsService {
 
     private final Map<String, CandidateStats> statsMap = new ConcurrentHashMap<>();
 
+    /**
+     * Сброс всей статистики (например, при /restart).
+     */
     public void resetStatistic() {
         statsMap.clear();
     }
 
     /**
-     * Получение всей статистики для всех кандидатов
+     * Статистика по всем кандидатам.
      */
     public String getAllCandidatesStatistics() {
         if (statsMap.isEmpty()) {
@@ -97,22 +97,29 @@ public class VoteStatisticsService {
         }
         StringBuilder sb = new StringBuilder("📊 Текущая статистика:\n\n");
         statsMap.forEach((candidateKey, stats) -> {
-            sb.append("👤 Кандидат: ").append(CandidateConstants.getCandidateName(candidateKey)).append("\n")
-                    .append(stats.getStatsText()).append("\n\n");
+            sb.append("👤 Кандидат: ")
+                    .append(CandidateConstants.getCandidateName(candidateKey))
+                    .append("\n")
+                    .append(stats.getStatsText())
+                    .append("\n\n");
         });
         return sb.toString();
     }
 
     /**
-     * Получение детальной статистики по конкретному кандидату
+     * Статистика по конкретному кандидату.
      */
     public String getCandidateStatistics(String candidateKey) {
         CandidateStats stats = statsMap.get(candidateKey);
-        return (stats != null)
-                ? stats.getStatsText()
-                : "Статистика отсутствует.";
+        if (stats == null) {
+            return "Статистика отсутствует.";
+        }
+        return stats.getStatsText();
     }
 
+    /**
+     * Возвращает (или создаёт) объект статистики по кандидату.
+     */
     private CandidateStats getOrCreate(String candidateKey) {
         return statsMap.computeIfAbsent(candidateKey, k -> new CandidateStats());
     }

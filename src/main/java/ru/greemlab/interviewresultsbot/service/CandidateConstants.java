@@ -17,9 +17,9 @@ public final class CandidateConstants {
 
     public static String getCandidateName(String key) {
         return switch (key) {
-            case VICTORIA -> "Виктория 🧑💼";
-            case SVETLANA -> "Светлана 👩💻";
-            case ALEXANDER -> "Александр 👨🔧";
+            case VICTORIA -> "Виктория ";
+            case SVETLANA -> "Светлана ";
+            case ALEXANDER -> "Александр ";
             default -> "Неизвестный кандидат";
         };
     }

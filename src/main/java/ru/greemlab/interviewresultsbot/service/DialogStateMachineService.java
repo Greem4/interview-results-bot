@@ -10,11 +10,6 @@ import ru.greemlab.interviewresultsbot.util.KeyboardFactory;
 
 import static ru.greemlab.interviewresultsbot.service.UserStateService.UserState;
 
-/**
- * Основная логика «диалога» и «состояний» вынесена сюда:
- * 1. processTextMessage() – реакции на обычные сообщения.
- * 2. processCallbackQuery() – реакции на нажатие inline-кнопок.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -25,7 +20,7 @@ public class DialogStateMachineService {
     private final ArchiveCandidatesService archiveCandidatesService;
 
     /**
-     * Обрабатывает входящий текст от пользователя (команды и т.д.)
+     * Обработка обычных текстовых сообщений.
      */
     public void processTextMessage(CandidateEvaluationBot bot, Message message) {
         final Long chatId = message.getChatId();
@@ -39,56 +34,66 @@ public class DialogStateMachineService {
     }
 
     /**
-     * Обрабатывает нажатие на inline-кнопку
+     * Обработка inline-кнопок.
      */
     public void processCallbackQuery(CandidateEvaluationBot bot, CallbackQuery callbackQuery) {
         final Long chatId = callbackQuery.getMessage().getChatId();
         final Integer messageId = callbackQuery.getMessage().getMessageId();
         final String data = callbackQuery.getData();
 
-        // «Служебные» кнопки (статистика, архив)
+        // Проверяем кнопки "Архив" / "Статистика"
         if (CallbackCommands.ARCHIVE.equals(data)) {
-            bot.editMessage(chatId, messageId, archiveCandidatesService.getArchiveSummary(), null);
+            // Просто шлём новое (временное) сообщение с архивом, потом можем удалить его,
+            // либо оставить решение на пользователе
+            var archiveMsgId = bot.sendTextMessage(chatId, archiveCandidatesService.getArchiveSummary(), null);
+            // Если нужно, можете убрать сообщение через несколько секунд, или оставить
             return;
         }
         if (CallbackCommands.CURRENT_STATS.equals(data)) {
-            bot.editMessage(chatId, messageId, voteStatisticsService.getAllCandidatesStatistics(), null);
+            var statsMsgId = bot.sendTextMessage(chatId, voteStatisticsService.getAllCandidatesStatistics(), null);
+            // Аналогично, можно по желанию потом удалить
             return;
         }
 
-        // Логика пошагового заполнения
+        // Узнаём текущее состояние
         final UserState currentState = userStateService.getState(chatId);
+
         switch (currentState) {
-            case START -> handleCandidateSelection(bot, chatId, messageId, data);
-            case WAITING_RESPONSIBILITY -> handleRatingSelection(bot, chatId, messageId, data,
-                    CallbackCommands.RESP_PREFIX, UserState.WAITING_INTEREST);
-            case WAITING_INTEREST -> handleRatingSelection(bot, chatId, messageId, data,
-                    CallbackCommands.INTR_PREFIX, UserState.WAITING_RESULT_FOCUS);
-            case WAITING_RESULT_FOCUS -> handleRatingSelection(bot, chatId, messageId, data,
-                    CallbackCommands.RESF_PREFIX, UserState.WAITING_INVITE);
-            case WAITING_INVITE -> handleInvitationDecision(bot, chatId, messageId, data);
+            case START -> handleCandidateSelection(bot, chatId, data);
+            case WAITING_RESPONSIBILITY ->
+                    handleRatingSelection(bot, chatId, data, CallbackCommands.RESP_PREFIX, UserState.WAITING_INTEREST);
+            case WAITING_INTEREST ->
+                    handleRatingSelection(bot, chatId, data, CallbackCommands.INTR_PREFIX, UserState.WAITING_RESULT_FOCUS);
+            case WAITING_RESULT_FOCUS ->
+                    handleRatingSelection(bot, chatId, data, CallbackCommands.RESF_PREFIX, UserState.WAITING_INVITE);
+            case WAITING_INVITE -> handleInvitationDecision(bot, chatId, data);
             default ->
                     log.warn("Непредусмотренное состояние диалога: {} (chatId={})", currentState, chatId);
         }
     }
 
-    /** ====================== Методы для /start, /restart ======================== */
+    /* ====================== /start, /restart и дефолтные ответы ====================== */
 
     private void handleStartCommand(CandidateEvaluationBot bot, Long chatId) {
+        // Сбрасываем сессию этого пользователя
         userStateService.resetState(chatId);
+
+        // Отправляем только ОДНО «главное меню» (кандидаты + кнопки статистики/архива),
+        // которое не будем редактировать в дальнейшем
         bot.sendTextMessage(
                 chatId,
-                "🌟 Добро пожаловать! Выберите действие:",
+                "🌟 Добро пожаловать! Ниже кнопки для работы:",
                 KeyboardFactory.buildMainMenuKeyboard()
         );
     }
 
     private void handleRestartCommand(CandidateEvaluationBot bot, Long chatId) {
+        // Полный сброс всех пользователей, статистики
         userStateService.resetAllSessions();
         voteStatisticsService.resetStatistic();
         bot.sendTextMessage(
                 chatId,
-                "🔄 Все данные сброшены. Начните заново с /start.",
+                "🔄 Данные сброшены. Наберите /start, чтобы начать заново.",
                 null
         );
     }
@@ -96,58 +101,80 @@ public class DialogStateMachineService {
     private void sendDefaultResponse(CandidateEvaluationBot bot, Long chatId) {
         bot.sendTextMessage(
                 chatId,
-                "ℹ Введите /start, чтобы начать.",
+                "ℹ Неизвестная команда. Введите /start, чтобы начать.",
                 null
         );
     }
 
-    /* ====================== Логика выбора кандидата и оценок ======================== */
+    /* ====================== Шаги голосования ====================== */
 
-    private void handleCandidateSelection(CandidateEvaluationBot bot, Long chatId,
-                                          Integer messageId, String data) {
-        if (!CandidateConstants.ALL.contains(data)) {
-            log.warn("Получен невалидный кандидат: {} (chatId={})", data, chatId);
+    /**
+     * Пользователь в состоянии START нажал на имя кандидата.
+     */
+    private void handleCandidateSelection(CandidateEvaluationBot bot, Long chatId, String candidateKey) {
+        if (!CandidateConstants.ALL.contains(candidateKey)) {
+            log.warn("Некорректный выбор кандидата: {} (chatId={})", candidateKey, chatId);
             return;
         }
-        // Сохраняем выбранного кандидата в state
-        userStateService.setCandidate(chatId, data);
-        userStateService.setState(chatId, UserState.WAITING_RESPONSIBILITY);
+        var session = userStateService.getOrCreateSession(chatId);
 
-        bot.editMessage(
+        // Проверим, не голосовал ли уже пользователь
+        if (session.hasVotedFor(candidateKey)) {
+            // Уже голосовал за этого кандидата – просто покажем статистику
+            var stats = voteStatisticsService.getCandidateStatistics(candidateKey);
+            var msgText = "Вы уже голосовали за " + CandidateConstants.getCandidateName(candidateKey)
+                          + "\n\nТекущая статистика:\n" + stats;
+            bot.sendTextMessage(chatId, msgText, null);
+            return;
+        }
+
+        // Иначе начинаем новый цикл голосования.
+        session.setCandidateKey(candidateKey);
+        session.setState(UserState.WAITING_RESPONSIBILITY);
+
+        // Отправим «временное» сообщение (шаг 1)
+        // Запишем ID этого сообщения в сессию, чтобы потом обновлять или удалить
+        var messageId = bot.sendTextMessage(
                 chatId,
-                messageId,
-                "📝 Вы выбрали: " + CandidateConstants.getCandidateName(data)
-                + "\n\n➡ Шаг 1/4: Оцените ответственность (1-5):",
+                "📝 Вы выбрали: " + CandidateConstants.getCandidateName(candidateKey)
+                + "\n➡ Шаг 1/4: Оцените ответственность (1-5)",
                 KeyboardFactory.buildRatingButtons(CallbackCommands.RESP_PREFIX)
         );
+
+        session.setTempMessageId(messageId); // сохраним, чтобы дальше редактировать
     }
 
+    /**
+     * Обработка оценки (1..5) для одного из трёх критериев (ответственность, интерес, результативность).
+     */
     private void handleRatingSelection(
             CandidateEvaluationBot bot,
             Long chatId,
-            Integer messageId,
             String data,
             String expectedPrefix,
             UserState nextState
     ) {
         if (!data.startsWith(expectedPrefix)) {
-            log.warn("Неверный префикс для оценки: {} (chatId={})", data, chatId);
+            log.warn("Неправильный префикс для оценки: {} (chatId={})", data, chatId);
             return;
         }
-        final String scoreStr = data.substring(expectedPrefix.length());
+        var session = userStateService.getOrCreateSession(chatId);
+        var messageId = session.getTempMessageId(); // то самое «временное» сообщение
+
+        // Извлекаем число
         int score;
         try {
+            var scoreStr = data.substring(expectedPrefix.length());
             score = Integer.parseInt(scoreStr);
             if (score < 1 || score > 5) {
-                throw new NumberFormatException("Score out of range 1..5");
+                throw new NumberFormatException("Score out of range");
             }
         } catch (NumberFormatException e) {
-            log.error("Некорректная оценка: {} (chatId={}), {}", scoreStr, chatId, e.getMessage());
+            log.error("Некорректная оценка: {} (chatId={})", data, chatId);
             return;
         }
 
-        // Сохраняем оценку
-        final String candidateKey = userStateService.getCandidate(chatId);
+        var candidateKey = session.getCandidateKey();
         switch (expectedPrefix) {
             case CallbackCommands.RESP_PREFIX -> voteStatisticsService.addResponsibility(candidateKey, score);
             case CallbackCommands.INTR_PREFIX -> voteStatisticsService.addInterest(candidateKey, score);
@@ -155,62 +182,84 @@ public class DialogStateMachineService {
             default -> log.warn("Неизвестный тип оценки: {}", expectedPrefix);
         }
 
-        // Следующий шаг
-        userStateService.setState(chatId, nextState);
+        // Переходим к следующему шагу
+        session.setState(nextState);
 
-        final String nextText;
-        final var nextKeyboard = switch (nextState) {
+        // Формируем текст и клавиатуру для следующего шага
+        String nextText;
+        var nextKeyboard = switch (nextState) {
             case WAITING_INTEREST -> {
-                nextText = "➡ Шаг 2/4: Оцените интерес к делу (1-5):";
+                nextText = "➡ Шаг 2/4: Оцените интерес (1-5)";
                 yield KeyboardFactory.buildRatingButtons(CallbackCommands.INTR_PREFIX);
             }
             case WAITING_RESULT_FOCUS -> {
-                nextText = "➡ Шаг 3/4: Оцените направленность на результат (1-5):";
+                nextText = "➡ Шаг 3/4: Оцените направленность на результат (1-5)";
                 yield KeyboardFactory.buildRatingButtons(CallbackCommands.RESF_PREFIX);
             }
             case WAITING_INVITE -> {
-                nextText = "➡ Шаг 4/4: Пригласили ли вы данного кандидата?";
+                nextText = "➡ Шаг 4/4: Пригласить кандидата?";
                 yield KeyboardFactory.buildInviteKeyboard();
             }
             default -> {
-                nextText = "Неизвестный шаг...";
+                nextText = "Неизвестный шаг";
                 yield null;
             }
         };
 
-        bot.editMessage(chatId, messageId, nextText, nextKeyboard);
+        // Редактируем то же самое «временное» сообщение
+        bot.editMessage(
+                chatId,
+                messageId,
+                "📝 Вы выбрали: " + CandidateConstants.getCandidateName(candidateKey)
+                + "\n" + nextText,
+                nextKeyboard
+        );
     }
 
-    private void handleInvitationDecision(CandidateEvaluationBot bot, Long chatId,
-                                          Integer messageId, String data) {
+    /**
+     * Шаг "Пригласить / Не приглашать".
+     */
+    private void handleInvitationDecision(CandidateEvaluationBot bot, Long chatId, String data) {
         if (!data.equals(CallbackCommands.INVITE_YES) && !data.equals(CallbackCommands.INVITE_NO)) {
-            log.warn("Неизвестная кнопка на шаге INVITE: {} (chatId={})", data, chatId);
+            log.warn("Непонятная кнопка в шаге INVITE: {} (chatId={})", data, chatId);
             return;
         }
 
-        final String candidateKey = userStateService.getCandidate(chatId);
+        var session = userStateService.getOrCreateSession(chatId);
+        var candidateKey = session.getCandidateKey();
+        var tempMsgId = session.getTempMessageId();
+
+        // Сохраняем голос
         if (data.equals(CallbackCommands.INVITE_YES)) {
             voteStatisticsService.addInviteYes(candidateKey);
         } else {
             voteStatisticsService.addInviteNo(candidateKey);
         }
+        // Помечаем, что пользователь проголосовал за этого кандидата
+        session.markVoted(candidateKey);
 
-        // Завершаем сессию
-        final String stats = voteStatisticsService.getCandidateStatistics(candidateKey);
-        final String msg = String.format(
-                "✅ Спасибо за оценку!\n\n📊 Статистика по кандидату %s:\n%s",
-                CandidateConstants.getCandidateName(candidateKey),
-                stats
-        );
+        // Завершение цикла голосования
+        session.setState(UserState.START);
+        session.setCandidateKey(null);
 
-        bot.editMessage(chatId, messageId, msg, null);
+        // (По желанию) показываем в «временном» сообщении итоги, а потом удаляем
+        // Или можно сразу удалить без показа
+        var stats = voteStatisticsService.getCandidateStatistics(candidateKey);
+        var finalText = "✅ Голосование завершено!\n\n"
+                        + "Результаты по кандидату " + CandidateConstants.getCandidateName(candidateKey) + ":\n"
+                        + stats
+                        + "\n\n(Сообщение сейчас исчезнет)";
 
-        // Возвращаем пользователя в состояние START
-        userStateService.setState(chatId, UserState.START);
-        userStateService.setCandidate(chatId, null);
+        // Редактируем текст итогового шага (без клавиатуры)
+        bot.editMessage(chatId, tempMsgId, finalText, null);
 
-        // Предлагаем начать заново
-        bot.sendTextMessage(chatId, "🔄 Для нового голосования введите /start",
-                KeyboardFactory.buildMainMenuKeyboard());
+        // Удаляем «временное» сообщение, чтобы «всё остальное» исчезло
+        bot.deleteMessage(chatId, tempMsgId);
+
+        // Стираем информацию о tempMessageId, чтобы не было путаницы
+        session.setTempMessageId(null);
+
+        // Если нужно – можем ничего больше не отправлять,
+        // так как в чате остаётся только «главное меню» с именами и статистикой/архивом.
     }
 }
