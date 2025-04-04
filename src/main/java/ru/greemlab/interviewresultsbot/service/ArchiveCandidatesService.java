@@ -20,11 +20,11 @@ public class ArchiveCandidatesService {
      */
     @PostConstruct
     public void init() {
-        addSampleCandidate("Петров П.П.", new int[]{4,5}, new int[]{4,3}, new int[]{5,5}, 2, 0);
-        addSampleCandidate("Сидорова К.К.", new int[]{3}, new int[]{3,3,4}, new int[]{2,3}, 0, 1);
-        addSampleCandidate("Иванов С.С.", new int[]{5,5}, new int[]{5}, new int[]{4,4,4}, 3, 0);
-        addSampleCandidate("Ковалёва Л.Л.", new int[]{3,4}, new int[]{4,5}, new int[]{5}, 1, 1);
-        addSampleCandidate("Самойлов Р.Р.", new int[]{5,5,5}, new int[]{5,5}, new int[]{5}, 2, 0);
+        addSampleCandidate("Петров П.П.", new int[]{4, 5}, new int[]{4, 3}, new int[]{5, 5}, 2, 0);
+        addSampleCandidate("Сидорова К.К.", new int[]{3}, new int[]{3, 3, 4}, new int[]{2, 3}, 0, 1);
+        addSampleCandidate("Иванов С.С.", new int[]{5, 5}, new int[]{5}, new int[]{4, 4, 4}, 3, 0);
+        addSampleCandidate("Ковалёва Л.Л.", new int[]{3, 4}, new int[]{4, 5}, new int[]{5}, 1, 1);
+        addSampleCandidate("Самойлов Р.Р.", new int[]{5, 5, 5}, new int[]{5, 5}, new int[]{5}, 2, 0);
     }
 
     public String getArchiveSummary() {
@@ -33,8 +33,7 @@ public class ArchiveCandidatesService {
         }
         StringBuilder sb = new StringBuilder("📁 Архив соискателей:\n\n");
         archive.forEach((name, stats) -> {
-            sb.append("▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄\n")
-                    .append("👤 Кандидат: ").append(name).append("\n")
+            sb.append("👤 Кандидат: ").append(name).append("\n")
                     .append(stats.getStatsText()).append("\n\n");
         });
         return sb.toString();

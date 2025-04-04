@@ -20,9 +20,9 @@ public class KeyboardFactory {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         // Кнопки выбора кандидатов
-        rows.add(List.of(createButton("Виктория 🧑💼", CandidateConstants.VICTORIA)));
-        rows.add(List.of(createButton("Светлана 👩💻", CandidateConstants.SVETLANA)));
-        rows.add(List.of(createButton("Александр 👨🔧", CandidateConstants.ALEXANDER)));
+        rows.add(List.of(createButton("Виктория", CandidateConstants.VICTORIA)));
+        rows.add(List.of(createButton("Светлана", CandidateConstants.SVETLANA)));
+        rows.add(List.of(createButton("Александр", CandidateConstants.ALEXANDER)));
 
         // «Сервисные» кнопки
         rows.add(List.of(

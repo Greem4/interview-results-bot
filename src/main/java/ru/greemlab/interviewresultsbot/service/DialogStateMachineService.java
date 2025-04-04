@@ -198,7 +198,7 @@ public class DialogStateMachineService {
         // Завершаем сессию
         final String stats = voteStatisticsService.getCandidateStatistics(candidateKey);
         final String msg = String.format(
-                "✅ Спасибо за оценку!\n\n📊 Статистика по кандидату %s:\n%s\n─────────────────────",
+                "✅ Спасибо за оценку!\n\n📊 Статистика по кандидату %s:\n%s",
                 CandidateConstants.getCandidateName(candidateKey),
                 stats
         );

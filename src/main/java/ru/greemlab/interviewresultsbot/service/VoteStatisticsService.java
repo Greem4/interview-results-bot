@@ -57,15 +57,15 @@ public class VoteStatisticsService {
         public String getStatsText() {
             return String.format(
                     """
-                            ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                            ┫ 📈 Статистика:
-                            ┣────────────────────────────
-                            ┃ Ответственность: %s
-                            ┃ Интерес: %s
-                            ┃ Результативность: %s
-                            ┣────────────────────────────
-                            ┃ Приглашения: ✅ %d | ❌ %d
-                            ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━""",
+                            
+                             📈 Статистика:
+                            
+                             Ответственность: %s
+                             Интерес: %s
+                             Результативность: %s
+                            
+                             Приглашения: ✅ %d | ❌ %d
+                            """,
                     formatScore(countResponsibility.get(), totalResponsibility.get()),
                     formatScore(countInterest.get(), totalInterest.get()),
                     formatScore(countResultFocus.get(), totalResultFocus.get()),
@@ -97,8 +97,7 @@ public class VoteStatisticsService {
         }
         StringBuilder sb = new StringBuilder("📊 Текущая статистика:\n\n");
         statsMap.forEach((candidateKey, stats) -> {
-            sb.append("▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄\n")
-                    .append("👤 Кандидат: ").append(CandidateConstants.getCandidateName(candidateKey)).append("\n")
+            sb.append("👤 Кандидат: ").append(CandidateConstants.getCandidateName(candidateKey)).append("\n")
                     .append(stats.getStatsText()).append("\n\n");
         });
         return sb.toString();
