@@ -126,6 +126,7 @@ public class DialogStateMachineService {
             var msgText = "Вы уже голосовали за " + CandidateConstants.getCandidateName(candidateKey)
                           + "\n\nТекущая статистика:\n" + stats;
             bot.sendTextMessage(chatId, msgText, null);
+            handleStartCommand(bot, chatId);
             return;
         }
 
@@ -190,7 +191,7 @@ public class DialogStateMachineService {
         String nextText;
         var nextKeyboard = switch (nextState) {
             case WAITING_INTEREST -> {
-                nextText = "➡ Шаг 2/4: Оцените интерес (1-5)";
+                nextText = "➡ Шаг 2/4: Оцените интерес к делу  (1-5)";
                 yield KeyboardFactory.buildRatingButtons(CallbackCommands.INTR_PREFIX);
             }
             case WAITING_RESULT_FOCUS -> {
@@ -198,7 +199,7 @@ public class DialogStateMachineService {
                 yield KeyboardFactory.buildRatingButtons(CallbackCommands.RESF_PREFIX);
             }
             case WAITING_INVITE -> {
-                nextText = "➡ Шаг 4/4: Пригласить кандидата?";
+                nextText = "➡ Шаг 4/4: Пригласили ли Вы данного кандидата на работу?";
                 yield KeyboardFactory.buildInviteKeyboard();
             }
             default -> {
@@ -259,7 +260,6 @@ public class DialogStateMachineService {
 
         // Стираем информацию о tempMessageId, чтобы не было путаницы
         session.setTempMessageId(null);
-        handleStartCommand(bot, chatId);
 
         // Если нужно – можем ничего больше не отправлять,
         // так как в чате остаётся только «главное меню» с именами и статистикой/архивом.
