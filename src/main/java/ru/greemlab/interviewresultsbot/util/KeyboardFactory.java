@@ -26,7 +26,7 @@ public class KeyboardFactory {
 
         // «Сервисные» кнопки
         rows.add(List.of(
-                createButton("📊 Текущая статистика", CallbackCommands.CURRENT_STATS),
+//                createButton("📊 Текущая статистика", CallbackCommands.CURRENT_STATS),
                 createButton("📁 Архив", CallbackCommands.ARCHIVE)
         ));
 

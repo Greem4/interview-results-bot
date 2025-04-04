@@ -47,6 +47,7 @@ public class DialogStateMachineService {
             // либо оставить решение на пользователе
             var archiveMsgId = bot.sendTextMessage(chatId, archiveCandidatesService.getArchiveSummary(), null);
             // Если нужно, можете убрать сообщение через несколько секунд, или оставить
+            handleStartCommand(bot, chatId);
             return;
         }
         if (CallbackCommands.CURRENT_STATS.equals(data)) {
@@ -82,7 +83,7 @@ public class DialogStateMachineService {
         // которое не будем редактировать в дальнейшем
         bot.sendTextMessage(
                 chatId,
-                "🌟 Добро пожаловать! Ниже кнопки для работы:",
+                "🌟 Добро пожаловать! Ниже кнопки для выбора кандидата:",
                 KeyboardFactory.buildMainMenuKeyboard()
         );
     }
@@ -258,6 +259,7 @@ public class DialogStateMachineService {
 
         // Стираем информацию о tempMessageId, чтобы не было путаницы
         session.setTempMessageId(null);
+        handleStartCommand(bot, chatId);
 
         // Если нужно – можем ничего больше не отправлять,
         // так как в чате остаётся только «главное меню» с именами и статистикой/архивом.
